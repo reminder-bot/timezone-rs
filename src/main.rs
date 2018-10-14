@@ -7,9 +7,12 @@ extern crate mysql;
 use std::env;
 use serenity::prelude::EventHandler;
 use serenity::model::gateway::{Game, Ready};
+use serenity::model::channel::{ChannelType, PermissionOverwrite, PermissionOverwriteType};
+use serenity::model::id::RoleId;
 use serenity::prelude::Context;
 use dotenv::dotenv;
 use typemap::Key;
+use serenity::model::permissions::Permissions;
 
 
 struct Globals;
@@ -37,11 +40,15 @@ fn main() {
 
     let mut client = serenity::client::Client::new(&token, Handler).unwrap();
     client.with_framework(serenity::framework::standard::StandardFramework::new()
-        .configure(|c| c.prefix("?t"))
+        .configure(|c| c
+            .prefix("timezone ")
+            .on_mention(true)
+        )
 
         .cmd("help", help)
         .cmd("invite", info)
         .cmd("info", info)
+        .cmd("new", new)
     );
 
     let mut my = mysql::Conn::new("mysql://root:testpassword@localhost/timezone").unwrap();
@@ -55,6 +62,30 @@ fn main() {
         println!("An error occured: {:?}", e);
     }
 }
+
+command!(new(context, message) {
+    let g = match message.guild_id {
+        Some(g) => g,
+
+        None => return Ok(()),
+    };
+
+    match g.create_channel("%H:%M (%Z)", ChannelType::Voice, None) {
+        Ok(chan) => {
+            let _ = message.channel_id.send_message(|m| {
+                m.content("New channel created!")
+            });
+            let overwrite = PermissionOverwrite{allow: Permissions::empty(), deny: Permissions::CONNECT, kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))};
+            chan.create_permission(&overwrite);
+        },
+
+        Err(e) => {
+            let _ = message.channel_id.send_message(|m| {
+                m.content(format!("Error creating channel: {:?}", e))
+            });
+        }
+    }
+});
 
 command!(help(_context, message) {
     let _ = message.channel_id.send_message(|m| {
