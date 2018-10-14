@@ -1,8 +1,8 @@
 #[macro_use] extern crate serenity;
+#[macro_use] extern crate mysql;
 
 extern crate dotenv;
 extern crate typemap;
-extern crate mysql;
 
 use std::env;
 use serenity::prelude::EventHandler;
@@ -18,7 +18,7 @@ use serenity::model::permissions::Permissions;
 struct Globals;
 
 impl Key for Globals {
-    type Value = mysql::Conn;
+    type Value = mysql::Pool;
 }
 
 
@@ -51,7 +51,7 @@ fn main() {
         .cmd("new", new)
     );
 
-    let mut my = mysql::Conn::new("mysql://root:testpassword@localhost/timezone").unwrap();
+    let my = mysql::Pool::new("mysql://root:testpassword@localhost/timezone").unwrap();
 
     {
         let mut data = client.data.lock();
@@ -70,18 +70,67 @@ command!(new(context, message) {
         None => return Ok(()),
     };
 
+    let m = match message.member() {
+        Some(m) => m,
+
+        None => return Ok(()),
+    };
+
+    match m.permissions() {
+        Ok(p) => {
+            if !p.manage_guild() {
+                let _ = message.reply("You must be a guild manager to perform this command.");
+                return Ok(())
+            }
+        },
+
+        Err(_) => return Ok(()),
+    }
+
     match g.create_channel("%H:%M (%Z)", ChannelType::Voice, None) {
         Ok(chan) => {
             let _ = message.channel_id.send_message(|m| {
                 m.content("New channel created!")
             });
-            let overwrite = PermissionOverwrite{allow: Permissions::empty(), deny: Permissions::CONNECT, kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))};
-            chan.create_permission(&overwrite);
+
+            let overwrite = PermissionOverwrite{
+                allow: Permissions::empty(),
+                deny: Permissions::CONNECT,
+                kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))
+            };
+
+            match chan.create_permission(&overwrite) {
+                Ok(_) => {},
+
+                Err(_) => {
+                    let _ = message.channel_id.send_message(|m| {
+                        m.content("Channel was created, but permissions couldn't be applied.")
+                    });
+                }
+            }
+
+            {
+                println!("Writing DB..");
+
+                let mut data = context.data.lock();
+                let mut mysql = data.get::<Globals>().unwrap();
+
+                for mut stmt in mysql.prepare(r"INSERT INTO clocks (channel_id, timezone, name, guild_id) VALUES (:chan, :tz, :name, :guild)").into_iter() {
+                    stmt.execute(params!{
+                        "chan" => chan.id.as_u64(),
+                        "tz" => "GB",
+                        "name" => "%H:%M (%Z)",
+                        "guild" => g.as_u64(),
+                    }).unwrap();
+                }
+
+                println!("Done")
+            }
         },
 
-        Err(e) => {
+        Err(_) => {
             let _ = message.channel_id.send_message(|m| {
-                m.content(format!("Error creating channel: {:?}", e))
+                m.content(format!("Error creating channel"))
             });
         }
     }
