@@ -3,6 +3,7 @@
 
 extern crate dotenv;
 extern crate typemap;
+extern crate chrono_tz;
 
 use std::env;
 use serenity::prelude::EventHandler;
@@ -13,6 +14,7 @@ use serenity::prelude::Context;
 use dotenv::dotenv;
 use typemap::Key;
 use serenity::model::permissions::Permissions;
+use chrono_tz::Tz;
 
 
 struct Globals;
@@ -63,7 +65,7 @@ fn main() {
     }
 }
 
-command!(new(context, message) {
+command!(new(context, message, args) {
     let g = match message.guild_id {
         Some(g) => g,
 
@@ -86,6 +88,25 @@ command!(new(context, message) {
 
         Err(_) => return Ok(()),
     }
+
+    let tz: Tz = match args.single::<String>() {
+        Err(_) => {
+            let _ = message.reply("Please supply a timezone for your new channel");
+            return Ok(())
+        },
+
+        Ok(p) => match p.parse() {
+            Err(_) => {
+                let _ = message.reply("Timezone couldn't be parsed. Please try again");
+                return Ok(())
+            },
+
+            Ok(t) => t
+        },
+    };
+    let arguments = args.full();
+    println!("{}", arguments);
+
 
     match g.create_channel("%H:%M (%Z)", ChannelType::Voice, None) {
         Ok(chan) => {
@@ -110,8 +131,6 @@ command!(new(context, message) {
             }
 
             {
-                println!("Writing DB..");
-
                 let mut data = context.data.lock();
                 let mut mysql = data.get::<Globals>().unwrap();
 
@@ -123,8 +142,6 @@ command!(new(context, message) {
                         "guild" => g.as_u64(),
                     }).unwrap();
                 }
-
-                println!("Done")
             }
         },
 
