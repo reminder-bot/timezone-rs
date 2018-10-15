@@ -4,6 +4,7 @@
 extern crate dotenv;
 extern crate typemap;
 extern crate chrono_tz;
+extern crate chrono;
 
 use std::env;
 use serenity::prelude::EventHandler;
@@ -15,6 +16,7 @@ use dotenv::dotenv;
 use typemap::Key;
 use serenity::model::permissions::Permissions;
 use chrono_tz::Tz;
+use chrono::prelude::*;
 
 
 struct Globals;
@@ -51,6 +53,7 @@ fn main() {
         .cmd("invite", info)
         .cmd("info", info)
         .cmd("new", new)
+        .cmd("personal", personal)
     );
 
     let my = mysql::Pool::new("mysql://root:testpassword@localhost/timezone").unwrap();
@@ -97,7 +100,7 @@ command!(new(context, message, args) {
 
         Ok(p) => match p.parse::<Tz>() {
             Err(_) => {
-                let _ = message.reply("Timezone couldn't be parsed. Please try again");
+                let _ = message.reply("Timezone couldn't be parsed. Please try again. A list of timezones is available here: https://gist.github.com/JellyWX/913dfc8b63d45192ad6cb54c829324ee");
                 return Ok(())
             },
 
@@ -109,7 +112,7 @@ command!(new(context, message, args) {
     match g.create_channel(&name, ChannelType::Voice, None) {
         Ok(chan) => {
             let _ = message.channel_id.send_message(|m| {
-                m.content("New channel created!")
+                m.content("New channel created! It will update soon...")
             });
 
             let overwrite = PermissionOverwrite{
@@ -147,6 +150,34 @@ command!(new(context, message, args) {
             let _ = message.channel_id.send_message(|m| {
                 m.content(format!("Error creating channel"))
             });
+        }
+    }
+});
+
+command!(personal(context, message, args) {
+
+    let arg = args.single::<String>().unwrap();
+    let tz: Tz = match arg.parse() {
+        Err(_) => {
+            let _ = message.reply("Please provide a valid timezone as an argument. All timezones can be viewed here: https://gist.github.com/JellyWX/913dfc8b63d45192ad6cb54c829324ee");
+            return Ok(())
+        },
+
+        Ok(t) => t
+    };
+
+    let dt = Utc::now().with_timezone(&tz);
+    let _ = message.reply(&format!("Your current time should be {}", dt.format("%H:%M")));
+
+    {
+        let mut data = context.data.lock();
+        let mut mysql = data.get::<Globals>().unwrap();
+
+        for mut stmt in mysql.prepare(r"INSERT INTO users (id, timezone) VALUES (:id, :tz").into_iter() {
+            stmt.execute(params!{
+                "id" => message.author.id.as_u64(),
+                "tz" => &arg,
+            }).unwrap();
         }
     }
 });
