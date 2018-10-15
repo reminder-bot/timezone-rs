@@ -89,26 +89,24 @@ command!(new(context, message, args) {
         Err(_) => return Ok(()),
     }
 
-    let tz: Tz = match args.single::<String>() {
+    let tz: String = match args.single::<String>() {
         Err(_) => {
             let _ = message.reply("Please supply a timezone for your new channel");
             return Ok(())
         },
 
-        Ok(p) => match p.parse() {
+        Ok(p) => match p.parse::<Tz>() {
             Err(_) => {
                 let _ = message.reply("Timezone couldn't be parsed. Please try again");
                 return Ok(())
             },
 
-            Ok(t) => t
+            Ok(_) => p
         },
     };
-    let arguments = args.full();
-    println!("{}", arguments);
+    let name = args.rest();
 
-
-    match g.create_channel("%H:%M (%Z)", ChannelType::Voice, None) {
+    match g.create_channel(&name, ChannelType::Voice, None) {
         Ok(chan) => {
             let _ = message.channel_id.send_message(|m| {
                 m.content("New channel created!")
@@ -137,8 +135,8 @@ command!(new(context, message, args) {
                 for mut stmt in mysql.prepare(r"INSERT INTO clocks (channel_id, timezone, name, guild_id) VALUES (:chan, :tz, :name, :guild)").into_iter() {
                     stmt.execute(params!{
                         "chan" => chan.id.as_u64(),
-                        "tz" => "GB",
-                        "name" => "%H:%M (%Z)",
+                        "tz" => &tz,
+                        "name" => &name,
                         "guild" => g.as_u64(),
                     }).unwrap();
                 }
