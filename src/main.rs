@@ -54,6 +54,7 @@ fn main() {
         .cmd("info", info)
         .cmd("new", new)
         .cmd("personal", personal)
+        .cmd("check", check)
     );
 
     let my = mysql::Pool::new("mysql://root:testpassword@localhost/timezone").unwrap();
@@ -195,6 +196,27 @@ command!(personal(context, message, args) {
                 })
             .unwrap();
         }
+    }
+});
+
+command!(check(context, message) {
+    if message.mentions.len() == 1 {
+        let mut data = context.data.lock();
+        let mut mysql = data.get::<Globals>().unwrap();
+
+        for res in mysql.prep_exec("SELECT timezone FROM users WHERE id = :id", params!{"id" => message.mentions.first().unwrap().id.as_u64()}).unwrap() {
+            let tz = mysql::from_row::<String>(res.unwrap());
+
+            let r: Tz = tz.parse().unwrap();
+            let dt = Utc::now().with_timezone(&r);
+
+            let _ = message.channel_id.send_message(|m| {
+                m.content(format!("{}'s current time is {}", message.mentions.first().unwrap().name, dt.format("%H:%M")))
+            });
+        }
+    }
+    else {
+        let _ = message.reply("Please mention the user you wish to check the timezone of.");
     }
 });
 
