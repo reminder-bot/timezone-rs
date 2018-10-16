@@ -69,6 +69,7 @@ fn main() {
     }
 }
 
+
 command!(new(context, message, args) {
     let g = match message.guild_id {
         Some(g) => g,
@@ -108,12 +109,17 @@ command!(new(context, message, args) {
             Ok(_) => p
         },
     };
-    let name = args.rest();
+    let mut name = args.rest();
+    if name.is_empty() {
+        name = "🕒 %H:%M (%Z)";
+    }
 
-    match g.create_channel(&name, ChannelType::Voice, None) {
+    let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
+
+    match g.create_channel(dt.format(name).to_string().as_str(), ChannelType::Voice, None) {
         Ok(chan) => {
             let _ = message.channel_id.send_message(|m| {
-                m.content("New channel created! It will update soon...")
+                m.content("New channel created!")
             });
 
             let overwrite = PermissionOverwrite{
@@ -147,13 +153,14 @@ command!(new(context, message, args) {
             }
         },
 
-        Err(_) => {
+        Err(e) => {
             let _ = message.channel_id.send_message(|m| {
-                m.content(format!("Error creating channel"))
+                m.content(format!("Error creating channel: {:?}", e))
             });
         }
     }
 });
+
 
 command!(personal(context, message, args) {
 
@@ -199,6 +206,7 @@ command!(personal(context, message, args) {
     }
 });
 
+
 command!(check(context, message) {
     if message.mentions.len() == 1 {
         let mut data = context.data.lock();
@@ -211,7 +219,7 @@ command!(check(context, message) {
             let dt = Utc::now().with_timezone(&r);
 
             let _ = message.channel_id.send_message(|m| {
-                m.content(format!("{}'s current time is {}", message.mentions.first().unwrap().name, dt.format("%H:%M")))
+                m.content(format!("{}'s current time is `{}`", message.mentions.first().unwrap().name, dt.format("%H:%M")))
             });
         }
     }
@@ -219,6 +227,7 @@ command!(check(context, message) {
         let _ = message.reply("Please mention the user you wish to check the timezone of.");
     }
 });
+
 
 command!(help(_context, message) {
     let _ = message.channel_id.send_message(|m| {
