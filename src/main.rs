@@ -181,11 +181,11 @@ command!(personal(context, message, args) {
         let mut data = context.data.lock();
         let mut mysql = data.get::<Globals>().unwrap();
 
-        let mut count = 0;
 
-        for res in mysql.prep_exec("SELECT COUNT(*) FROM users WHERE id = :id", params!{"id" => message.author.id.as_u64()}).unwrap() {
-            count = mysql::from_row::<i32>(res.unwrap());
-        }
+        let cq = mysql.prep_exec("SELECT COUNT(*) FROM users WHERE id = :id", params!{"id" => message.author.id.as_u64()}).unwrap()
+            .into_iter()
+            .next().unwrap();
+        let count = mysql::from_row::<i32>(cq.unwrap());
 
         if count > 0 {
             mysql.prep_exec("UPDATE users SET timezone = :tz WHERE id = :id", params!{
