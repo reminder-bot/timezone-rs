@@ -41,6 +41,7 @@ fn main() {
     dotenv().ok();
 
     let token = env::var("DISCORD_TOKEN").expect("token");
+    let sql_url = env::var("SQL_URL").expect("sql url");
 
     let mut client = serenity::client::Client::new(&token, Handler).unwrap();
     client.with_framework(serenity::framework::standard::StandardFramework::new()
@@ -57,7 +58,7 @@ fn main() {
         .cmd("check", check)
     );
 
-    let my = mysql::Pool::new("mysql://root:testpassword@localhost/timezone").unwrap();
+    let my = mysql::Pool::new(sql_url).unwrap();
 
     {
         let mut data = client.data.lock();
