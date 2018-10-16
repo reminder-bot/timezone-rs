@@ -173,11 +173,27 @@ command!(personal(context, message, args) {
         let mut data = context.data.lock();
         let mut mysql = data.get::<Globals>().unwrap();
 
-        for mut stmt in mysql.prepare(r"INSERT INTO users (id, timezone) VALUES (:id, :tz").into_iter() {
-            stmt.execute(params!{
+        let mut count = 0;
+
+        for res in mysql.prep_exec("SELECT COUNT(*) FROM users WHERE id = :id", params!{"id" => message.author.id.as_u64()}).unwrap() {
+            count = mysql::from_row::<i32>(res.unwrap());
+        }
+
+        if count > 0 {
+            mysql.prep_exec("UPDATE users SET timezone = :tz WHERE id = :id", params!{
                 "id" => message.author.id.as_u64(),
-                "tz" => &arg,
-            }).unwrap();
+                "tz" => &arg
+            })
+            .unwrap();
+        }
+        else {
+            mysql.prep_exec(
+                r"INSERT INTO users (id, timezone) VALUES (:id, :tz)",
+                params!{
+                    "id" => message.author.id.as_u64(),
+                    "tz" => &arg
+                })
+            .unwrap();
         }
     }
 });
