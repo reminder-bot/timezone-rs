@@ -231,10 +231,13 @@ command!(check(context, message) {
 
 
 command!(help(_context, message) {
+    let dt = Utc::now();
+
     let _ = message.channel_id.send_message(|m| {
         m.embed(|e| {
             e.title("Help")
-            .description("
+            .description(
+                format!("
 `timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name as below:
 
 ```
@@ -243,7 +246,7 @@ Available inputs: %H (hours), %M (minutes), %Z (timezone), %d (day), %p (AM/PM),
 Example:
     %H o'clock on the %dth
 Displays:
-    {hours} o'clock on the {days}th
+    {}
 
 Default Value:
     🕒 %H:%M (%Z)
@@ -256,7 +259,8 @@ More inputs can be found here: http://strftime.org/
 `timezone check <user mention>` - Check the time in a user's timezone, if they set it with `timezone personal`.
 
 `timezone delete [id]` - Delete timezone channels. Without arguments, will clean up channels manually deleted or delete a channel you are connected to in voice.
-            ")
+            ", dt.format("%H o'clock on the %dth"))
+        )
         })
     });
 });
