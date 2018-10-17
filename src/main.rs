@@ -18,6 +18,7 @@ use typemap::Key;
 use serenity::model::permissions::Permissions;
 use chrono_tz::Tz;
 use chrono::prelude::*;
+use std::collections::HashMap;
 
 
 struct Globals;
@@ -37,7 +38,23 @@ impl EventHandler for Handler {
         };
 
         let c = reqwest::Client::new();
-        c.post("https://discordbots.org/").header("Authorization", "token").send();
+        let mut m = HashMap::new();
+        m.insert("server_count", guild_count);
+
+        c.post("https://discordbots.org/api/bots/stats").header("Authorization", env::var("DBL_TOKEN").unwrap()).header("Content-Type", "application/json").json(&m).send().unwrap();
+    }
+
+    fn guild_delete(&self, _context: Context, _guild: serenity::model::guild::PartialGuild, _full: Option<std::sync::Arc<serenity::prelude::RwLock<serenity::model::guild::Guild>>>) {
+        let guild_count = {
+            let cache = serenity::CACHE.read();
+            cache.all_guilds().len()
+        };
+
+        let c = reqwest::Client::new();
+        let mut m = HashMap::new();
+        m.insert("server_count", guild_count);
+
+        c.post("https://discordbots.org/api/bots/stats").header("Authorization", env::var("DBL_TOKEN").unwrap()).header("Content-Type", "application/json").json(&m).send().unwrap();
     }
 
     fn ready(&self, context: Context, _: Ready) {
