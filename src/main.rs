@@ -5,6 +5,7 @@ extern crate dotenv;
 extern crate typemap;
 extern crate chrono_tz;
 extern crate chrono;
+extern crate reqwest;
 
 use std::env;
 use serenity::prelude::EventHandler;
@@ -29,6 +30,16 @@ impl Key for Globals {
 struct Handler;
 
 impl EventHandler for Handler {
+    fn guild_create(&self, _context: Context, _guild: serenity::model::guild::Guild, _new: bool) {
+        let guild_count = {
+            let cache = serenity::CACHE.read();
+            cache.all_guilds().len()
+        };
+
+        let c = reqwest::Client::new();
+        c.post("https://discordbots.org/").header("Authorization", "token").send();
+    }
+
     fn ready(&self, context: Context, _: Ready) {
         println!("Bot online!");
 
