@@ -82,6 +82,7 @@ fn main() {
         .cmd("invite", info)
         .cmd("info", info)
         .cmd("new", new)
+        .cmd("space", space)
         .cmd("personal", personal)
         .cmd("check", check)
     );
@@ -139,7 +140,7 @@ command!(new(context, message, args) {
         },
     };
     let mut name = args.rest();
-    if name.is_empty() {
+    if !name.contains("%") || name.len() > 64 {
         name = "🕒 %H:%M (%Z)";
     }
 
@@ -171,12 +172,11 @@ command!(new(context, message, args) {
                 let mut data = context.data.lock();
                 let mut mysql = data.get::<Globals>().unwrap();
 
-                for mut stmt in mysql.prepare(r"INSERT INTO clocks (channel_id, timezone, name, guild_id) VALUES (:chan, :tz, :name, :guild)").into_iter() {
+                for mut stmt in mysql.prepare(r"INSERT INTO clocks (channel, timezone, name) VALUES (:chan, :tz, :name)").into_iter() {
                     stmt.execute(params!{
                         "chan" => chan.id.as_u64(),
                         "tz" => &tz,
                         "name" => &name,
-                        "guild" => g.as_u64(),
                     }).unwrap();
                 }
             }
@@ -188,6 +188,68 @@ command!(new(context, message, args) {
             });
         }
     }
+});
+
+command!(space(context, message, args) {
+    let g = match message.guild_id {
+        Some(g) => g,
+
+        None => return Ok(()),
+    };
+
+    let m = match message.member() {
+        Some(m) => m,
+
+        None => return Ok(()),
+    };
+
+    match m.permissions() {
+        Ok(p) => {
+            if !p.manage_guild() {
+                let _ = message.reply("You must be a guild manager to perform this command.");
+                return Ok(())
+            }
+        },
+
+        Err(_) => return Ok(()),
+    }
+
+    let tz: String = match args.single::<String>() {
+        Err(_) => {
+            let _ = message.reply("Please supply a timezone for your new clock");
+            return Ok(())
+        },
+
+        Ok(p) => match p.parse::<Tz>() {
+            Err(_) => {
+                let _ = message.reply("Timezone couldn't be parsed. Please try again. A list of timezones is available here: https://gist.github.com/JellyWX/913dfc8b63d45192ad6cb54c829324ee");
+                return Ok(())
+            },
+
+            Ok(_) => p
+        },
+    };
+    let mut name = args.rest();
+    if !name.contains("%") || name.len() > 64 {
+        name = "🕒 %H:%M (%Z)";
+    }
+
+    let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
+
+    let msg = message.channel_id.send_message(|m| m
+        .content(dt.format(name).to_string().as_str())
+    ).unwrap();
+
+    let mut data = context.data.lock();
+    let mut mysql = data.get::<Globals>().unwrap();
+
+    mysql.prep_exec("INSERT INTO clocks (channel, timezone, name, message) VALUES (:channel, :timezone, :name, :message)", params!{
+        "channel" => msg.channel_id.as_u64(),
+        "timezone" => &tz,
+        "name" => &name,
+        "message" => msg.id.as_u64(),
+    });
+
 });
 
 
@@ -279,8 +341,8 @@ Displays:
 Default Value:
     🕒 %H:%M (%Z)
 
-More inputs can be found here: http://strftime.org/
 ```
+*More inputs can be found here: http://strftime.org/*
 
 `timezone personal <timezone name>` - Set your personal timezone, so others can check in on you.
 

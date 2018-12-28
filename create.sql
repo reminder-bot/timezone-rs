@@ -1,0 +1,17 @@
+CREATE TABLE timezone.clocks (
+    id INT UNSIGNED UNIQUE AUTO_INCREMENT,
+    channel BIGINT UNSIGNED NOT NULL,
+    timezone VARCHAR(32) NOT NULL DEFAULT "UTC",
+    name VARCHAR(64) NOT NULL DEFAULT "🕒 %H:%M (%Z)",
+    message BIGINT UNSIGNED,
+
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE timezone.users (
+    map_id INT UNSIGNED UNIQUE AUTO_INCREMENT,
+    id BIGINT UNIQUE,
+    timezone VARCHAR(32),
+
+    PRIMARY KEY (id)
+);
