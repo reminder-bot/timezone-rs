@@ -328,7 +328,9 @@ command!(help(_context, message) {
             e.title("Help")
             .description(
                 format!("
-`timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name as below:
+`timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name as in the available inputs section.
+
+`timezone space <timezone name> [formatting]` - Create a new clock message in your current channel. You can customize the message as in the available inputs section.
 
 ```
 Available inputs: %H (hours), %M (minutes), %Z (timezone), %d (day), %p (AM/PM), %A (day name), %I (12 hour clock)
