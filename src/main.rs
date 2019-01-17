@@ -374,7 +374,7 @@ Default Value:
     🕒 %H:%M (%Z)
 
 ```
-*More inputs can be found here: http://strftime.org/*
+*More inputs can be found here: https://strftime.ninja/*
 
 `timezone personal <timezone name>` - Set your personal timezone, so others can check in on you.
 
