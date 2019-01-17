@@ -141,7 +141,28 @@ command!(new(context, message, args) {
     };
     let mut name = args.rest();
     if !name.contains("%") || name.len() > 64 {
-        name = "🕒 %H:%M (%Z)";
+        if name.starts_with("preset:") {
+            name = match name {
+                "preset:24" => "🕒 %H:%M (%Z)",
+
+                "preset:24:plain" => "%H:%M  %Z",
+
+                "preset:24:minimal" => "%H:%M",
+
+                "preset:12" => "🕒 %I:%M %p (%Z)",
+
+                "preset:12:plain" => "%I:%M %p  %Z",
+
+                "preset:12:minimal" => "%I:%M %p",
+
+                "preset:day" => "%A",
+
+                _ => "🕒 %H:%M (%Z)",
+            };
+        }
+        else {
+            name = "🕒 %H:%M (%Z)";
+        }
     }
 
     let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
@@ -191,10 +212,8 @@ command!(new(context, message, args) {
 });
 
 command!(space(context, message, args) {
-    let g = match message.guild_id {
-        Some(g) => g,
-
-        None => return Ok(()),
+    if message.guild_id.is_none() {
+        return Ok(())
     };
 
     let m = match message.member() {
@@ -248,7 +267,7 @@ command!(space(context, message, args) {
         "timezone" => &tz,
         "name" => &name,
         "message" => msg.id.as_u64(),
-    });
+    }).unwrap();
 
 });
 
@@ -328,9 +347,20 @@ command!(help(_context, message) {
             e.title("Help")
             .description(
                 format!("
-`timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name as in the available inputs section.
+`timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name using a preset or as in the available inputs section (advanced).
 
-`timezone space <timezone name> [formatting]` - Create a new clock message in your current channel. You can customize the message as in the available inputs section.
+
+**Available presets:**
+- `preset:24` - shows the 24 hour time
+- `preset:24:plain` - shows the time without emoji
+- `preset:24:minimal` - shows the time without emoji or timezone
+- `preset:12` - shows the 12 hour clock time
+- `preset:12:plain` - shows the time without emoji
+- `preset:12:minimal` - shows the time without emoji or timezone
+- `preset:day` - shows the day
+
+
+`timezone space <timezone name> [formatting]` - Create a new clock message in your current channel. You can customize the message as in the available inputs section (advanced).
 
 ```
 Available inputs: %H (hours), %M (minutes), %Z (timezone), %d (day), %p (AM/PM), %A (day name), %I (12 hour clock)
