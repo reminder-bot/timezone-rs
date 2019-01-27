@@ -32,29 +32,11 @@ struct Handler;
 
 impl EventHandler for Handler {
     fn guild_create(&self, _context: Context, _guild: serenity::model::guild::Guild, _new: bool) {
-        let guild_count = {
-            let cache = serenity::CACHE.read();
-            cache.all_guilds().len()
-        };
-
-        let c = reqwest::Client::new();
-        let mut m = HashMap::new();
-        m.insert("server_count", guild_count);
-
-        let _ = c.post("https://discordbots.org/api/bots/stats").header("Authorization", env::var("DBL_TOKEN").unwrap()).header("Content-Type", "application/json").json(&m).send().unwrap();
+        send();
     }
 
     fn guild_delete(&self, _context: Context, _guild: serenity::model::guild::PartialGuild, _full: Option<std::sync::Arc<serenity::prelude::RwLock<serenity::model::guild::Guild>>>) {
-        let guild_count = {
-            let cache = serenity::CACHE.read();
-            cache.all_guilds().len()
-        };
-
-        let c = reqwest::Client::new();
-        let mut m = HashMap::new();
-        m.insert("server_count", guild_count);
-
-        c.post("https://discordbots.org/api/bots/stats").header("Authorization", env::var("DBL_TOKEN").unwrap()).header("Content-Type", "application/json").json(&m).send().unwrap();
+        send();
     }
 
     fn ready(&self, context: Context, _: Ready) {
@@ -62,6 +44,20 @@ impl EventHandler for Handler {
 
         context.set_game(Game::playing("@Bot o'clock help"));
     }
+}
+
+
+fn send() {
+    let guild_count = {
+        let cache = serenity::CACHE.read();
+        cache.all_guilds().len()
+    };
+
+    let c = reqwest::Client::new();
+    let mut m = HashMap::new();
+    m.insert("server_count", guild_count);
+
+    c.post("https://discordbots.org/api/bots/stats").header("Authorization", env::var("DBL_TOKEN").unwrap()).header("Content-Type", "application/json").json(&m).send().unwrap();
 }
 
 
@@ -101,113 +97,99 @@ fn main() {
 
 
 command!(new(context, message, args) {
-    let g = match message.guild_id {
-        Some(g) => g,
+    match message.member() {
+        Some(m) => {
+            match m.permissions() {
+                Ok(p) => {
+                    if !p.manage_guild() {
+                        let _ = message.reply("You must be a guild manager to perform this command.");
+                        return Ok(())
+                    }
+                },
 
-        None => return Ok(()),
-    };
-
-    let m = match message.member() {
-        Some(m) => m,
-
-        None => return Ok(()),
-    };
-
-    match m.permissions() {
-        Ok(p) => {
-            if !p.manage_guild() {
-                let _ = message.reply("You must be a guild manager to perform this command.");
-                return Ok(())
+                Err(_) => return Ok(()),
             }
-        },
 
-        Err(_) => return Ok(()),
-    }
+            let tz: String = match args.single::<String>() {
+                Err(_) => {
+                    let _ = message.reply("Please supply a timezone for your new channel");
+                    return Ok(())
+                },
 
-    let tz: String = match args.single::<String>() {
-        Err(_) => {
-            let _ = message.reply("Please supply a timezone for your new channel");
-            return Ok(())
-        },
+                Ok(p) => match p.parse::<Tz>() {
+                    Err(_) => {
+                        let _ = message.reply("Timezone couldn't be parsed. Please try again. A list of timezones is available here: https://gist.github.com/JellyWX/913dfc8b63d45192ad6cb54c829324ee");
+                        return Ok(())
+                    },
 
-        Ok(p) => match p.parse::<Tz>() {
-            Err(_) => {
-                let _ = message.reply("Timezone couldn't be parsed. Please try again. A list of timezones is available here: https://gist.github.com/JellyWX/913dfc8b63d45192ad6cb54c829324ee");
-                return Ok(())
-            },
-
-            Ok(_) => p
-        },
-    };
-    let mut name = args.rest();
-    if !name.contains("%") || name.len() > 64 {
-        if name.starts_with("preset:") {
-            name = match name {
-                "preset:24" => "🕒 %H:%M (%Z)",
-
-                "preset:24:plain" => "%H:%M  %Z",
-
-                "preset:24:minimal" => "%H:%M",
-
-                "preset:12" => "🕒 %I:%M %p (%Z)",
-
-                "preset:12:plain" => "%I:%M %p  %Z",
-
-                "preset:12:minimal" => "%I:%M %p",
-
-                "preset:day" => "%A",
-
-                _ => "🕒 %H:%M (%Z)",
-            };
-        }
-        else {
-            name = "🕒 %H:%M (%Z)";
-        }
-    }
-
-    let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
-
-    match g.create_channel(dt.format(name).to_string().as_str(), ChannelType::Voice, None) {
-        Ok(chan) => {
-            let _ = message.channel_id.send_message(|m| {
-                m.content("New channel created!")
-            });
-
-            let overwrite = PermissionOverwrite{
-                allow: Permissions::empty(),
-                deny: Permissions::CONNECT,
-                kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))
+                    Ok(_) => p
+                },
             };
 
-            match chan.create_permission(&overwrite) {
-                Ok(_) => {},
+            let mut name = args.rest();
+
+            if !name.contains("%") || name.len() > 64 {
+                if name.starts_with("preset:") {
+                    name = match name {
+                        "preset:24" => "🕒 %H:%M (%Z)",
+
+                        "preset:24:plain" => "%H:%M  %Z",
+
+                        "preset:24:minimal" => "%H:%M",
+
+                        "preset:12" => "🕒 %I:%M %p (%Z)",
+
+                        "preset:12:plain" => "%I:%M %p  %Z",
+
+                        "preset:12:minimal" => "%I:%M %p",
+
+                        "preset:day" => "%A",
+
+                        _ => "🕒 %H:%M (%Z)",
+                    };
+                }
+                else {
+                    name = "🕒 %H:%M (%Z)";
+                }
+            }
+
+            let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
+
+            let g = m.guild_id;
+
+            match g.create_channel(dt.format(name).to_string().as_str(), ChannelType::Voice, None) {
+                Ok(chan) => {
+                    let _ = message.channel_id.say("New channel created!");
+
+                    let overwrite = PermissionOverwrite{
+                        allow: Permissions::empty(),
+                        deny: Permissions::CONNECT,
+                        kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))
+                    };
+
+                    let _ = chan.create_permission(&overwrite);
+
+                    {
+                        let mut data = context.data.lock();
+                        let mut mysql = data.get::<Globals>().unwrap();
+
+                        for mut stmt in mysql.prepare(r"INSERT INTO clocks (channel, timezone, name) VALUES (:chan, :tz, :name)").into_iter() {
+                            stmt.execute(params!{
+                                "chan" => chan.id.as_u64(),
+                                "tz" => &tz,
+                                "name" => &name,
+                            }).unwrap();
+                        }
+                    }
+                },
 
                 Err(_) => {
-                    let _ = message.channel_id.send_message(|m| {
-                        m.content("Channel was created, but permissions couldn't be applied.")
-                    });
-                }
-            }
-
-            {
-                let mut data = context.data.lock();
-                let mut mysql = data.get::<Globals>().unwrap();
-
-                for mut stmt in mysql.prepare(r"INSERT INTO clocks (channel, timezone, name) VALUES (:chan, :tz, :name)").into_iter() {
-                    stmt.execute(params!{
-                        "chan" => chan.id.as_u64(),
-                        "tz" => &tz,
-                        "name" => &name,
-                    }).unwrap();
+                    let _ = message.channel_id.say("Error creating channel. Please ensure I have admin");
                 }
             }
         },
 
-        Err(e) => {
-            let _ = message.channel_id.send_message(|m| {
-                m.content(format!("Error creating channel: {:?}", e))
-            });
-        }
+        None => {},
     }
 });
 

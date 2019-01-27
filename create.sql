@@ -10,7 +10,7 @@ CREATE TABLE timezone.clocks (
 
 CREATE TABLE timezone.users (
     map_id INT UNSIGNED UNIQUE AUTO_INCREMENT,
-    id BIGINT UNIQUE,
+    id BIGINT UNSIGNED UNIQUE,
     timezone VARCHAR(32),
 
     PRIMARY KEY (id)
