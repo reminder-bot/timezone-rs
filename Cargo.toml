@@ -4,10 +4,10 @@ version = "0.1.0"
 authors = ["jude-LafiteIII <judewrs@gmail.com>"]
 
 [dependencies]
-serenity = "0.5"
-dotenv = "0.9.0"
+serenity = "0.5.11"
+dotenv = "0.10.1"
 typemap = "*"
-mysql = "*"
+mysql = "14.2"
 chrono = "*"
 chrono-tz = "*"
-reqwest = "*"
+reqwest = "0.9.5"

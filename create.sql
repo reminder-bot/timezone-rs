@@ -3,7 +3,6 @@ CREATE TABLE timezone.clocks (
     channel BIGINT UNSIGNED NOT NULL,
     timezone VARCHAR(32) NOT NULL DEFAULT "UTC",
     name VARCHAR(64) NOT NULL DEFAULT "🕒 %H:%M (%Z)",
-    message BIGINT UNSIGNED,
 
     PRIMARY KEY (id)
 );

@@ -78,7 +78,6 @@ fn main() {
         .cmd("invite", info)
         .cmd("info", info)
         .cmd("new", new)
-        .cmd("space", new)
         .cmd("personal", personal)
         .cmd("check", check)
     );
@@ -155,54 +154,34 @@ command!(new(context, message, args) {
 
             let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
 
-            if message.content.contains("space") {
+            let g = m.guild_id;
 
-                let msg = message.channel_id.send_message(|m| m
-                    .content(dt.format(name).to_string().as_str())
-                ).unwrap();
+            match g.create_channel(dt.format(name).to_string().as_str(), ChannelType::Voice, None) {
+                Ok(chan) => {
+                    let _ = message.channel_id.say("New channel created!");
 
-                let mut data = context.data.lock();
-                let mut mysql = data.get::<Globals>().unwrap();
+                    let overwrite = PermissionOverwrite{
+                        allow: Permissions::empty(),
+                        deny: Permissions::CONNECT,
+                        kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))
+                    };
 
-                mysql.prep_exec("INSERT INTO clocks (channel, timezone, name, message) VALUES (:channel, :timezone, :name, :message)", params!{
-                    "channel" => msg.channel_id.as_u64(),
-                    "timezone" => tz,
-                    "name" => name,
-                    "message" => msg.id.as_u64(),
-                }).unwrap();
+                    let _ = chan.create_permission(&overwrite);
 
-            }
-            else {
+                    {
+                        let mut data = context.data.lock();
+                        let mut mysql = data.get::<Globals>().unwrap();
 
-                let g = m.guild_id;
-
-                match g.create_channel(dt.format(name).to_string().as_str(), ChannelType::Voice, None) {
-                    Ok(chan) => {
-                        let _ = message.channel_id.say("New channel created!");
-
-                        let overwrite = PermissionOverwrite{
-                            allow: Permissions::empty(),
-                            deny: Permissions::CONNECT,
-                            kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))
-                        };
-
-                        let _ = chan.create_permission(&overwrite);
-
-                        {
-                            let mut data = context.data.lock();
-                            let mut mysql = data.get::<Globals>().unwrap();
-
-                            mysql.prep_exec(r"INSERT INTO clocks (channel, timezone, name) VALUES (:chan, :tz, :name)", params!{
-                                    "chan" => chan.id.as_u64(),
-                                    "tz" => tz,
-                                    "name" => name,
-                                }).unwrap();
-                        }
-                    },
-
-                    Err(_) => {
-                        let _ = message.channel_id.say("Error creating channel. Please ensure I have admin");
+                        mysql.prep_exec(r"INSERT INTO clocks (channel, timezone, name) VALUES (:chan, :tz, :name)", params!{
+                                "chan" => chan.id.as_u64(),
+                                "tz" => tz,
+                                "name" => name,
+                            }).unwrap();
                     }
+                },
+
+                Err(_) => {
+                    let _ = message.channel_id.say("Error creating channel. Please ensure I have admin");
                 }
             }
         },
