@@ -116,8 +116,10 @@ command!(new(context, message, args) {
 
             let v = mysql::from_row::<(u32)>(q.next().unwrap().unwrap());
 
-            if v > 1 {
-                let _ = message.channel_id.say("Guilds are allowed a maximum of 2 clocks each");
+            let max = env::var("MAX_CHANNELS").unwrap().parse::<u32>().unwrap();
+
+            if v >= max {
+                let _ = message.channel_id.say(&format!("Guilds are allowed a maximum of {} clocks each", max));
             }
 
             else {
