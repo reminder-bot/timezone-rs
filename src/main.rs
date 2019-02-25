@@ -10,15 +10,16 @@ extern crate reqwest;
 use std::env;
 use serenity::prelude::EventHandler;
 use serenity::model::gateway::{Game, Ready};
-use serenity::model::channel::{ChannelType, PermissionOverwrite, PermissionOverwriteType};
+use serenity::model::channel::{GuildChannel, ChannelType, PermissionOverwrite, PermissionOverwriteType};
 use serenity::model::id::RoleId;
-use serenity::prelude::Context;
+use serenity::prelude::{Context, RwLock};
 use dotenv::dotenv;
 use typemap::Key;
 use serenity::model::permissions::Permissions;
 use chrono_tz::Tz;
 use chrono::prelude::*;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 
 struct Globals;
@@ -37,6 +38,16 @@ impl EventHandler for Handler {
 
     fn guild_delete(&self, _context: Context, _guild: serenity::model::guild::PartialGuild, _full: Option<std::sync::Arc<serenity::prelude::RwLock<serenity::model::guild::Guild>>>) {
         send();
+    }
+
+    fn channel_delete(&self, context: Context, channel: Arc<RwLock<GuildChannel>>) {
+        let c = channel.read();
+        let channel_id = c.id.as_u64();
+
+        let data = context.data.lock();
+        let my = data.get::<Globals>().unwrap();
+
+        my.prep_exec("DELETE FROM clocks WHERE channel = :c", params!{"c" => channel_id}).unwrap();
     }
 
     fn ready(&self, context: Context, _: Ready) {
@@ -289,8 +300,6 @@ command!(help(_context, message) {
 - `preset:12:minimal` - shows the time without emoji or timezone
 - `preset:day` - shows the day
 
-
-`timezone space <timezone name> [formatting]` - Create a new clock message in your current channel. You can customize the message as in the available inputs section (advanced).
 
 ```
 Available inputs: %H (hours), %M (minutes), %Z (timezone), %d (day), %p (AM/PM), %A (day name), %I (12 hour clock)
