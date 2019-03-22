@@ -32,8 +32,10 @@ impl Key for Globals {
 struct Handler;
 
 impl EventHandler for Handler {
-    fn guild_create(&self, _context: Context, _guild: serenity::model::guild::Guild, _new: bool) {
-        send();
+    fn guild_create(&self, _context: Context, _guild: serenity::model::guild::Guild, is_new: bool) {
+        if is_new {
+            send();
+        }
     }
 
     fn guild_delete(&self, _context: Context, _guild: serenity::model::guild::PartialGuild, _full: Option<std::sync::Arc<serenity::prelude::RwLock<serenity::model::guild::Guild>>>) {
