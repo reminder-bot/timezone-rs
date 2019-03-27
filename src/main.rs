@@ -21,8 +21,10 @@ use chrono_tz::Tz;
 use chrono::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use threadpool::ThreadPool;
+use std::thread;
 
+
+const THREAD_COUNT: u64 = 6;
 
 struct MySQL;
 
@@ -79,35 +81,48 @@ fn send() {
 fn main() {
     dotenv().ok();
 
-    let token = env::var("DISCORD_TOKEN").expect("token");
-    let sql_url = env::var("SQL_URL").expect("sql url");
-    let threadpool = ThreadPool::new(20);
+    let mut threads = vec![];
 
-    let mut client = serenity::client::Client::new(&token, Handler).unwrap();
-    client.threadpool = threadpool;
-    client.with_framework(serenity::framework::standard::StandardFramework::new()
-        .configure(|c| c
-            .prefix("timezone ")
-            .on_mention(true)
+    for i in 0..THREAD_COUNT {
+        threads.push(
+            thread::spawn(move || {
+
+                println!("beginning thread {}", i);
+
+                let token = env::var("DISCORD_TOKEN").expect("token");
+                let sql_url = env::var("SQL_URL").expect("sql url");
+
+                let mut client = serenity::client::Client::new(&token, Handler).unwrap();
+                client.with_framework(serenity::framework::standard::StandardFramework::new()
+                    .configure(|c| c
+                        .prefix("timezone ")
+                        .on_mention(true)
+                    )
+
+                    .cmd("help", help)
+                    .cmd("invite", info)
+                    .cmd("info", info)
+                    .cmd("new", new)
+                    .cmd("personal", personal)
+                    .cmd("check", check)
+                );
+
+                let my = mysql::Pool::new(sql_url).unwrap();
+
+                {
+                    let mut data = client.data.lock();
+                    data.insert::<MySQL>(my);
+                }
+
+                if let Err(e) = client.start_shard(i, THREAD_COUNT) {
+                    println!("Error occured on shard {}: {:?}", i, e);
+                }
+            })
         )
-
-        .cmd("help", help)
-        .cmd("invite", info)
-        .cmd("info", info)
-        .cmd("new", new)
-        .cmd("personal", personal)
-        .cmd("check", check)
-    );
-
-    let my = mysql::Pool::new(sql_url).unwrap();
-
-    {
-        let mut data = client.data.lock();
-        data.insert::<MySQL>(my);
     }
 
-    if let Err(e) = client.start_autosharded() {
-        println!("An error occured: {:?}", e);
+    for thread in threads {
+        thread.join();
     }
 }
 
