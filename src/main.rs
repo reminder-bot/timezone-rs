@@ -6,6 +6,7 @@ extern crate typemap;
 extern crate chrono_tz;
 extern crate chrono;
 extern crate reqwest;
+extern crate threadpool;
 
 use std::env;
 use serenity::prelude::EventHandler;
@@ -20,11 +21,12 @@ use chrono_tz::Tz;
 use chrono::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
+use threadpool::ThreadPool;
 
 
-struct Globals;
+struct MySQL;
 
-impl Key for Globals {
+impl Key for MySQL {
     type Value = mysql::Pool;
 }
 
@@ -47,7 +49,7 @@ impl EventHandler for Handler {
         let channel_id = c.id.as_u64();
 
         let data = context.data.lock();
-        let my = data.get::<Globals>().unwrap();
+        let my = data.get::<MySQL>().unwrap();
 
         my.prep_exec("DELETE FROM clocks WHERE channel = :c", params!{"c" => channel_id}).unwrap();
     }
@@ -79,8 +81,10 @@ fn main() {
 
     let token = env::var("DISCORD_TOKEN").expect("token");
     let sql_url = env::var("SQL_URL").expect("sql url");
+    let threadpool = ThreadPool::new(20);
 
     let mut client = serenity::client::Client::new(&token, Handler).unwrap();
+    client.threadpool = threadpool;
     client.with_framework(serenity::framework::standard::StandardFramework::new()
         .configure(|c| c
             .prefix("timezone ")
@@ -99,7 +103,7 @@ fn main() {
 
     {
         let mut data = client.data.lock();
-        data.insert::<Globals>(my);
+        data.insert::<MySQL>(my);
     }
 
     if let Err(e) = client.start_autosharded() {
@@ -123,7 +127,7 @@ command!(new(context, message, args) {
             }
 
             let mut data = context.data.lock();
-            let mut mysql = data.get::<Globals>().unwrap();
+            let mut mysql = data.get::<MySQL>().unwrap();
 
             let mut q = mysql.prep_exec("SELECT COUNT(*) FROM clocks WHERE guild = :g", params!{"g" => message.guild_id.unwrap().as_u64()}).unwrap();
 
@@ -232,7 +236,7 @@ command!(personal(context, message, args) {
 
     {
         let mut data = context.data.lock();
-        let mut mysql = data.get::<Globals>().unwrap();
+        let mut mysql = data.get::<MySQL>().unwrap();
 
 
         let cq = mysql.prep_exec("SELECT COUNT(*) FROM users WHERE id = :id", params!{"id" => message.author.id.as_u64()}).unwrap()
@@ -263,7 +267,7 @@ command!(personal(context, message, args) {
 command!(check(context, message) {
     if message.mentions.len() == 1 {
         let mut data = context.data.lock();
-        let mut mysql = data.get::<Globals>().unwrap();
+        let mut mysql = data.get::<MySQL>().unwrap();
 
         for res in mysql.prep_exec("SELECT timezone FROM users WHERE id = :id", params!{"id" => message.mentions.first().unwrap().id.as_u64()}).unwrap() {
             let tz = mysql::from_row::<String>(res.unwrap());
