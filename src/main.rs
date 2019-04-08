@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::thread;
 
 
-const THREAD_COUNT: u64 = 6;
+const THREAD_COUNT: u64 = 3;
 
 struct MySQL;
 
@@ -311,6 +311,7 @@ command!(help(_context, message) {
                 format!("
 `timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name using a preset or as in the available inputs section (advanced).
 
+**This command is being removed in the near future. Please use our website instead: https://timezone.jellywx.com/**
 
 **Available presets:**
 - `preset:24` - shows the 24 hour time
@@ -353,11 +354,7 @@ command!(info(_context, message) {
             .description("
 Invite me: https://discordapp.com/oauth2/authorize?client_id=485424873863118848&scope=bot&permissions=8
 
-Bot o'clock is a part of the Fusion Network:
-https://discordbots.org/servers/366542432671760396
-
-It well accompanies Reminder Bot by @JellyWX:
-https://discordbots.org/bot/349920059549941761
+Add clock channels from your browser: **https://timezone.jellywx.com/**
 
 The bot can be summoned with a mention or using `timezone` as a prefix.
 
