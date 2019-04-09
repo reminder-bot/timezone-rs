@@ -11,15 +11,12 @@ extern crate threadpool;
 use std::env;
 use serenity::prelude::EventHandler;
 use serenity::model::gateway::{Game, Ready};
-use serenity::model::channel::{GuildChannel, ChannelType, PermissionOverwrite, PermissionOverwriteType};
-use serenity::model::id::RoleId;
+use serenity::model::channel::GuildChannel;
 use serenity::prelude::{Context, RwLock};
 use dotenv::dotenv;
 use typemap::Key;
-use serenity::model::permissions::Permissions;
 use chrono_tz::Tz;
 use chrono::prelude::*;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
 
@@ -36,16 +33,6 @@ impl Key for MySQL {
 struct Handler;
 
 impl EventHandler for Handler {
-    fn guild_create(&self, _context: Context, _guild: serenity::model::guild::Guild, is_new: bool) {
-        if is_new {
-            send();
-        }
-    }
-
-    fn guild_delete(&self, _context: Context, _guild: serenity::model::guild::PartialGuild, _full: Option<std::sync::Arc<serenity::prelude::RwLock<serenity::model::guild::Guild>>>) {
-        send();
-    }
-
     fn channel_delete(&self, context: Context, channel: Arc<RwLock<GuildChannel>>) {
         let c = channel.read();
         let channel_id = c.id.as_u64();
@@ -61,20 +48,6 @@ impl EventHandler for Handler {
 
         context.set_game(Game::playing("@Bot o'clock help"));
     }
-}
-
-
-fn send() {
-    let guild_count = {
-        let cache = serenity::CACHE.read();
-        cache.all_guilds().len()
-    };
-
-    let c = reqwest::Client::new();
-    let mut m = HashMap::new();
-    m.insert("server_count", guild_count);
-
-    c.post("https://discordbots.org/api/bots/stats").header("Authorization", env::var("DBL_TOKEN").unwrap()).header("Content-Type", "application/json").json(&m).send().unwrap();
 }
 
 
@@ -127,110 +100,8 @@ fn main() {
 }
 
 
-command!(new(context, message, args) {
-    match message.member() {
-        Some(m) => {
-            match m.permissions() {
-                Ok(p) => {
-                    if !p.manage_guild() {
-                        let _ = message.reply("You must be a guild manager to perform this command.");
-                        return Ok(())
-                    }
-                },
-
-                Err(_) => return Ok(()),
-            }
-
-            let mut data = context.data.lock();
-            let mut mysql = data.get::<MySQL>().unwrap();
-
-            let mut q = mysql.prep_exec("SELECT COUNT(*) FROM clocks WHERE guild = :g", params!{"g" => message.guild_id.unwrap().as_u64()}).unwrap();
-
-            let v = mysql::from_row::<(u32)>(q.next().unwrap().unwrap());
-
-            let max = env::var("MAX_CHANNELS").unwrap().parse::<u32>().unwrap();
-
-            if v >= max {
-                let _ = message.channel_id.say(&format!("Guilds are allowed a maximum of {} clocks each", max));
-            }
-
-            else {
-                let tz: String = match args.single::<String>() {
-                    Err(_) => {
-                        let _ = message.reply("Please supply a timezone for your new clock");
-                        return Ok(())
-                    },
-
-                    Ok(p) => match p.parse::<Tz>() {
-                        Err(_) => {
-                            let _ = message.reply("Timezone couldn't be parsed. Please try again. A list of timezones is available here: https://gist.github.com/JellyWX/913dfc8b63d45192ad6cb54c829324ee");
-                            return Ok(())
-                        },
-
-                        Ok(_) => p
-                    },
-                };
-
-                let mut name = args.rest();
-
-                if !name.contains("%") || name.len() > 64 {
-                    if name.starts_with("preset:") {
-                        name = match name {
-                            "preset:24" => "🕒 %H:%M (%Z)",
-
-                            "preset:24:plain" => "%H:%M  %Z",
-
-                            "preset:24:minimal" => "%H:%M",
-
-                            "preset:12" => "🕒 %I:%M %p (%Z)",
-
-                            "preset:12:plain" => "%I:%M %p  %Z",
-
-                            "preset:12:minimal" => "%I:%M %p",
-
-                            "preset:day" => "%A",
-
-                            _ => "🕒 %H:%M (%Z)",
-                        };
-                    }
-                    else {
-                        name = "🕒 %H:%M (%Z)";
-                    }
-                }
-
-                let dt = Utc::now().with_timezone(&tz.parse::<Tz>().unwrap());
-
-                let g = m.guild_id;
-
-                match g.create_channel(dt.format(name).to_string().as_str(), ChannelType::Voice, None) {
-                    Ok(chan) => {
-                        let _ = message.channel_id.say("New channel created!");
-
-                        let overwrite = PermissionOverwrite{
-                            allow: Permissions::empty(),
-                            deny: Permissions::CONNECT,
-                            kind: PermissionOverwriteType::Role(RoleId(*g.as_u64()))
-                        };
-
-                        let _ = chan.create_permission(&overwrite);
-
-                        mysql.prep_exec(r"INSERT INTO clocks (channel, timezone, name, guild) VALUES (:chan, :tz, :name, :guild)", params!{
-                                "chan" => chan.id.as_u64(),
-                                "tz" => tz,
-                                "name" => name,
-                                "guild" => message.guild_id.unwrap().as_u64(),
-                            }).unwrap();    
-                    },
-
-                    Err(_) => {
-                        let _ = message.channel_id.say("Error creating channel. Please ensure I have admin");
-                    }
-                }
-            }
-        },
-
-        None => {},
-    }
+command!(new(_context, message, _args) {
+    let _ = message.reply("This command has been removed. Please use the web dashboard instead: **https://timezone.jellywx.com/**");
 });
 
 
@@ -302,46 +173,16 @@ command!(check(context, message) {
 
 
 command!(help(_context, message) {
-    let dt = Utc::now();
-
     let _ = message.channel_id.send_message(|m| {
         m.embed(|e| {
             e.title("Help")
-            .description(
-                format!("
-`timezone new <timezone name> [formatting]` - Create a new clock channel in your guild. You can customize the channel name using a preset or as in the available inputs section (advanced).
-
-**This command is being removed in the near future. Please use our website instead: https://timezone.jellywx.com/**
-
-**Available presets:**
-- `preset:24` - shows the 24 hour time
-- `preset:24:plain` - shows the time without emoji
-- `preset:24:minimal` - shows the time without emoji or timezone
-- `preset:12` - shows the 12 hour clock time
-- `preset:12:plain` - shows the time without emoji
-- `preset:12:minimal` - shows the time without emoji or timezone
-- `preset:day` - shows the day
-
-
-```
-Available inputs: %H (hours), %M (minutes), %Z (timezone), %d (day), %p (AM/PM), %A (day name), %I (12 hour clock)
-
-Example:
-    %H o'clock on the %dth
-Displays:
-    {}
-
-Default Value:
-    🕒 %H:%M (%Z)
-
-```
-*More inputs can be found here: https://strftime.ninja/*
+            .description("
+Go to our dashboard to add clock channels: **https://timezone.jellywx.com/**
 
 `timezone personal <timezone name>` - Set your personal timezone, so others can check in on you.
 
 `timezone check <user mention>` - Check the time in a user's timezone, if they set it with `timezone personal`.
-            ", dt.format("%H o'clock on the %dth"))
-        )
+            ")
         })
     });
 });

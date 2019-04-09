@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["jude-LafiteIII <judewrs@gmail.com>"]
 
 [dependencies]
-serenity = "0.5.13"
 dotenv = "0.10.1"
 typemap = "0.3.3"
 mysql = "14.2"
@@ -12,3 +11,17 @@ chrono = "0.4.6"
 chrono-tz = "0.5.0"
 reqwest = "0.9.5"
 threadpool = "1.7.1"
+
+[dependencies.serenity]
+default-features = false
+features = [
+    "builder",
+    "client",
+    "framework",
+    "gateway",
+    "http",
+    "model",
+    "standard_framework",
+    "utils",
+]
+version = "0.5.13"
