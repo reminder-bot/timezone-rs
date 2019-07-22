@@ -10,18 +10,4 @@ mysql = "14.2"
 chrono = "0.4.6"
 chrono-tz = "0.5.0"
 reqwest = "0.9.5"
-threadpool = "1.7.1"
-
-[dependencies.serenity]
-default-features = false
-features = [
-    "builder",
-    "client",
-    "framework",
-    "gateway",
-    "http",
-    "model",
-    "standard_framework",
-    "utils",
-]
-version = "0.5.13"
+serenity = "0.5.14"

@@ -3,15 +3,16 @@ CREATE TABLE timezone.clocks (
     channel BIGINT UNSIGNED NOT NULL,
     timezone VARCHAR(32) NOT NULL DEFAULT "UTC",
     name VARCHAR(64) NOT NULL DEFAULT "🕒 %H:%M (%Z)",
-    guild BIGINT UNSIGNED,
+    guild BIGINT UNSIGNED NOT NULL,
+    user BIGINT UNSIGNED NOT NULL,
 
     PRIMARY KEY (id)
 );
 
 CREATE TABLE timezone.users (
     map_id INT UNSIGNED UNIQUE AUTO_INCREMENT,
-    id BIGINT UNSIGNED UNIQUE,
-    timezone VARCHAR(32),
+    id BIGINT UNSIGNED UNIQUE NOT NULL,
+    timezone VARCHAR(32) NOT NULL DEFAULT "UTC",
 
     PRIMARY KEY (id)
 );

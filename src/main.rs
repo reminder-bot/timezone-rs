@@ -6,11 +6,9 @@ extern crate typemap;
 extern crate chrono_tz;
 extern crate chrono;
 extern crate reqwest;
-extern crate threadpool;
 
 use std::env;
 use serenity::prelude::EventHandler;
-use serenity::model::gateway::{Game, Ready};
 use serenity::model::channel::GuildChannel;
 use serenity::prelude::{Context, RwLock};
 use dotenv::dotenv;
@@ -18,10 +16,7 @@ use typemap::Key;
 use chrono_tz::Tz;
 use chrono::prelude::*;
 use std::sync::Arc;
-use std::thread;
 
-
-const THREAD_COUNT: u64 = 3;
 
 struct MySQL;
 
@@ -42,67 +37,40 @@ impl EventHandler for Handler {
 
         my.prep_exec("DELETE FROM clocks WHERE channel = :c", params!{"c" => channel_id}).unwrap();
     }
-
-    fn ready(&self, context: Context, _: Ready) {
-        println!("Bot online!");
-
-        context.set_game(Game::playing("@Bot o'clock help"));
-    }
 }
 
 
 fn main() {
     dotenv().ok();
 
-    let mut threads = vec![];
+    let token = env::var("DISCORD_TOKEN").expect("token");
+    let sql_url = env::var("SQL_URL").expect("sql url");
 
-    for i in 0..THREAD_COUNT {
-        threads.push(
-            thread::spawn(move || {
-
-                println!("beginning thread {}", i);
-
-                let token = env::var("DISCORD_TOKEN").expect("token");
-                let sql_url = env::var("SQL_URL").expect("sql url");
-
-                let mut client = serenity::client::Client::new(&token, Handler).unwrap();
-                client.with_framework(serenity::framework::standard::StandardFramework::new()
-                    .configure(|c| c
-                        .prefix("timezone ")
-                        .on_mention(true)
-                    )
-
-                    .cmd("help", help)
-                    .cmd("invite", info)
-                    .cmd("info", info)
-                    .cmd("new", new)
-                    .cmd("personal", personal)
-                    .cmd("check", check)
-                );
-
-                let my = mysql::Pool::new(sql_url).unwrap();
-
-                {
-                    let mut data = client.data.lock();
-                    data.insert::<MySQL>(my);
-                }
-
-                if let Err(e) = client.start_shard(i, THREAD_COUNT) {
-                    println!("Error occured on shard {}: {:?}", i, e);
-                }
-            })
+    let mut client = serenity::client::Client::new(&token, Handler).unwrap();
+    client.with_framework(serenity::framework::standard::StandardFramework::new()
+        .configure(|c| c
+            .prefix("timezone ")
+            .on_mention(true)
         )
+
+        .cmd("help", help)
+        .cmd("invite", info)
+        .cmd("info", info)
+        .cmd("personal", personal)
+        .cmd("check", check)
+    );
+
+    let my = mysql::Pool::new(sql_url).unwrap();
+
+    {
+        let mut data = client.data.lock();
+        data.insert::<MySQL>(my);
     }
 
-    for thread in threads {
-        thread.join();
+    if let Err(e) = client.start_autosharded() {
+        println!("An error occured: {:?}", e);
     }
 }
-
-
-command!(new(_context, message, _args) {
-    let _ = message.reply("This command has been removed. Please use the web dashboard instead: **https://timezone.jellywx.com/**");
-});
 
 
 command!(personal(context, message, args) {
