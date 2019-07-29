@@ -163,6 +163,8 @@ command!(info(_context, message) {
             .description("
 Invite me: https://discordapp.com/oauth2/authorize?client_id=485424873863118848&scope=bot&permissions=8
 
+Join the Discord server: https://discord.gg/k4BwyZA
+
 Add clock channels from your browser: **https://timezone.jellywx.com/**
 
 The bot can be summoned with a mention or using `timezone` as a prefix.
