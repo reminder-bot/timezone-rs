@@ -161,7 +161,7 @@ command!(info(_context, message) {
         m.embed(|e| {
             e.title("Info")
             .description("
-Invite me: https://discordapp.com/oauth2/authorize?client_id=485424873863118848&scope=bot&permissions=8
+Invite me: https://discordapp.com/oauth2/authorize?client_id=608610425516589057&scope=bot&permissions=8
 
 Join the Discord server: https://discord.gg/k4BwyZA
 
