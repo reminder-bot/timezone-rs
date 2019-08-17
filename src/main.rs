@@ -60,9 +60,9 @@ fn main() {
         .cmd("check", check)
     );
 
-    let my = mysql::Pool::new(sql_url).unwrap();
-
     {
+        let my = mysql::Pool::new(sql_url).unwrap();
+        
         let mut data = client.data.lock();
         data.insert::<MySQL>(my);
     }
@@ -88,32 +88,29 @@ command!(personal(context, message, args) {
     let dt = Utc::now().with_timezone(&tz);
     let _ = message.reply(&format!("Your current time should be {}", dt.format("%H:%M")));
 
-    {
-        let mut data = context.data.lock();
-        let mut mysql = data.get::<MySQL>().unwrap();
+    let mut data = context.data.lock();
+    let mut mysql = data.get::<MySQL>().unwrap();
 
+    let cq = mysql.prep_exec("SELECT COUNT(*) FROM users WHERE id = :id", params!{"id" => message.author.id.as_u64()}).unwrap()
+        .into_iter()
+        .next().unwrap();
+    let count = mysql::from_row::<i32>(cq.unwrap());
 
-        let cq = mysql.prep_exec("SELECT COUNT(*) FROM users WHERE id = :id", params!{"id" => message.author.id.as_u64()}).unwrap()
-            .into_iter()
-            .next().unwrap();
-        let count = mysql::from_row::<i32>(cq.unwrap());
-
-        if count > 0 {
-            mysql.prep_exec("UPDATE users SET timezone = :tz WHERE id = :id", params!{
+    if count > 0 {
+        mysql.prep_exec("UPDATE users SET timezone = :tz WHERE id = :id", params!{
+            "id" => message.author.id.as_u64(),
+            "tz" => &arg
+        })
+        .unwrap();
+    }
+    else {
+        mysql.prep_exec(
+            r"INSERT INTO users (id, timezone) VALUES (:id, :tz)",
+            params!{
                 "id" => message.author.id.as_u64(),
                 "tz" => &arg
             })
-            .unwrap();
-        }
-        else {
-            mysql.prep_exec(
-                r"INSERT INTO users (id, timezone) VALUES (:id, :tz)",
-                params!{
-                    "id" => message.author.id.as_u64(),
-                    "tz" => &arg
-                })
-            .unwrap();
-        }
+        .unwrap();
     }
 });
 
